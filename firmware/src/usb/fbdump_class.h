@@ -14,6 +14,11 @@
 
 #include "fbdump_usb.h"
 
+// Versión del firmware (BCD). Va en bcdDevice: Windows cachea por
+// VID/PID/bcdDevice si el dispositivo tiene descriptor MS OS, así que hay
+// que subirla al cambiar ese descriptor.
+#define FBDUMP_FW_VERSION_BCD 0x0101
+
 // Tamaño máximo de una transferencia (usbd_edpt_xfer usa uint16_t).
 #define FBDUMP_MAX_XFER 65535u
 

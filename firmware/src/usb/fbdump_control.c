@@ -7,6 +7,7 @@
 
 #include "fbdump_usb.h"
 #include "speedtest/speedtest.h"
+#include "usb/fbdump_class.h"
 
 extern const uint8_t desc_ms_os_20[];
 
@@ -31,7 +32,7 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage,
     case FBDUMP_REQ_GET_INFO:
         s_info.magic = FBDUMP_INFO_MAGIC;
         s_info.proto_version = FBDUMP_PROTO_VERSION;
-        s_info.fw_version = 0x0100;
+        s_info.fw_version = FBDUMP_FW_VERSION_BCD;
         s_info.xfer_size = SPEEDTEST_XFER_SIZE;
         s_info.sys_clock_hz = clock_get_hz(clk_sys);
         return tud_control_xfer(rhport, request, &s_info, sizeof(s_info));

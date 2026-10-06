@@ -4,8 +4,8 @@
 #include "tusb.h"
 
 #include "fbdump_usb.h"
+#include "usb/fbdump_class.h"
 
-#define FW_VERSION_BCD 0x0100
 
 enum {
     ITF_NUM_FBDUMP = 0,
@@ -34,7 +34,7 @@ static const tusb_desc_device_t s_desc_device = {
     .bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
     .idVendor = FBDUMP_USB_VID,
     .idProduct = FBDUMP_USB_PID,
-    .bcdDevice = FW_VERSION_BCD,
+    .bcdDevice = FBDUMP_FW_VERSION_BCD,
     .iManufacturer = STRID_MANUFACTURER,
     .iProduct = STRID_PRODUCT,
     .iSerialNumber = STRID_SERIAL,
@@ -69,7 +69,10 @@ const uint8_t *tud_descriptor_configuration_cb(uint8_t index)
 //--------------------------------------------------------------------+
 
 #define BOS_TOTAL_LEN (TUD_BOS_DESC_LEN + TUD_BOS_MICROSOFT_OS_DESC_LEN)
-#define MS_OS_20_DESC_LEN 0xB2
+// Dispositivo no compuesto: las features van directamente bajo el set
+// header. Con subset headers de configuración/función (lo que usan los
+// ejemplos de TinyUSB, que son compuestos) Windows no aplica WinUSB.
+#define MS_OS_20_DESC_LEN 0xA2
 
 static const uint8_t s_desc_bos[] = {
     TUD_BOS_DESCRIPTOR(BOS_TOTAL_LEN, 1),
@@ -86,21 +89,13 @@ const uint8_t desc_ms_os_20[] = {
     U16_TO_U8S_LE(0x000A), U16_TO_U8S_LE(MS_OS_20_SET_HEADER_DESCRIPTOR),
     U32_TO_U8S_LE(0x06030000), U16_TO_U8S_LE(MS_OS_20_DESC_LEN),
 
-    // Configuration subset header
-    U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_CONFIGURATION), 0, 0,
-    U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A),
-
-    // Function subset header
-    U16_TO_U8S_LE(0x0008), U16_TO_U8S_LE(MS_OS_20_SUBSET_HEADER_FUNCTION), ITF_NUM_FBDUMP, 0,
-    U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A - 0x08),
-
     // Compatible ID: WINUSB
     U16_TO_U8S_LE(0x0014), U16_TO_U8S_LE(MS_OS_20_FEATURE_COMPATBLE_ID),
     'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
     // Registry property: DeviceInterfaceGUIDs
-    U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A - 0x08 - 0x08 - 0x14),
+    U16_TO_U8S_LE(MS_OS_20_DESC_LEN - 0x0A - 0x14),
     U16_TO_U8S_LE(MS_OS_20_FEATURE_REG_PROPERTY),
     U16_TO_U8S_LE(0x0007), U16_TO_U8S_LE(0x002A),
     'D', 0, 'e', 0, 'v', 0, 'i', 0, 'c', 0, 'e', 0, 'I', 0, 'n', 0, 't', 0, 'e', 0,
