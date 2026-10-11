@@ -237,6 +237,17 @@ def main():
                    help='carpeta de salida (por defecto: plaza_mii_extraida)')
     args = p.parse_args()
 
+    for nombre, ruta in (('la NAND', args.nand), ('el OTP', args.otp), ('el boot9', args.boot9),
+                         ('el movable.sed', args.movable), ('el nand_cid', args.cid)):
+        if ruta is not None and not ruta.is_file():
+            bins = sorted(f'{f.name}  ({f.stat().st_size:,} bytes)' for f in Path('.').glob('*.bin'))
+            sys.exit(f'No encuentro {nombre}: "{ruta}" no existe en esta carpeta.\n'
+                     'Archivos .bin que sí hay aquí:\n  ' + ('\n  '.join(bins) or '(ninguno)') +
+                     '\nUsa el nombre exacto (entre comillas si tiene espacios).')
+    if args.boot9 is not None and args.boot9.stat().st_size not in (0x8000, 0x10000):
+        sys.exit(f'"{args.boot9}" no parece un boot9.bin: mide {args.boot9.stat().st_size:,} bytes '
+                 'y debería medir 65,536 (o 32,768).')
+
     try:
         crypto = CryptoEngine(boot9=str(args.boot9) if args.boot9 else None)
     except (BootromNotFoundError, CorruptBootromError, FileNotFoundError) as e:
