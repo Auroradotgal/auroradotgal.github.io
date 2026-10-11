@@ -1,0 +1,141 @@
+# importar_plaza_mii.gm9 - script de GodMode9
+#
+# Importa los datos de Plaza Mii StreetPass de otra consola desde la
+# carpeta 0:/dundun de la SD, con esta estructura (la que deja
+# extraer_plaza_mii.py, mas el movable.sed):
+#
+#   0:/dundun/savedata/000202x8/00000000
+#   0:/dundun/extdata/f000000b/...
+#   0:/dundun/movable.sed            (solo si quieres inyectarlo)
+#
+# Tambien vale con la carpeta plaza_mii_extraida entera dentro de dundun.
+#
+# Pregunta si importar en la SysNAND o en la EmuNAND y si inyectar el
+# movable.sed. Hace copia de seguridad en 0:/gm9/out antes de tocar nada
+# y al final corrige los CMAC para que la consola acepte los datos.
+#
+# Uso: copialo a 0:/gm9/scripts/ y en GodMode9 pulsa HOME > Scripts...
+
+set ERRORMSG "Cancelado. No se ha cambiado nada."
+
+# --- Datos de origen ---
+set ORIGEN 0:/dundun
+if exist 0:/dundun/plaza_mii_extraida/savedata
+set ORIGEN 0:/dundun/plaza_mii_extraida
+end
+set ERRORMSG "No encuentro la partida en\n0:/dundun/savedata/000202x8\n \nNo se ha cambiado nada."
+find $[ORIGEN]/savedata/000202?8 SAVEPATH
+strsplit SAVEORIGEN $[SAVEPATH] "/"
+exist $[SAVEPATH]/00000000
+set ERRORMSG "No encuentro el extdata en\n0:/dundun/extdata/f000000b\n \nNo se ha cambiado nada."
+exist $[ORIGEN]/extdata/f000000b
+set MOVPATH 0:/dundun/movable.sed
+if exist $[ORIGEN]/movable.sed
+set MOVPATH $[ORIGEN]/movable.sed
+end
+set ERRORMSG "Cancelado. No se ha cambiado nada."
+
+# --- Destino: SysNAND o EmuNAND ---
+labelsel "Donde quieres importar\nla Plaza Mii?" donde_*
+@donde_EmuNAND
+set ERRORMSG "No hay EmuNAND en esta SD.\n \nNo se ha cambiado nada."
+exist 4:/private/movable.sed
+set DRV 4:
+set NOMBRE EmuNAND
+set IMAGEN E:/nand_minsize.bin
+goto destino_elegido
+@donde_SysNAND
+set DRV 1:
+set NOMBRE SysNAND
+set IMAGEN S:/nand_minsize.bin
+@destino_elegido
+set ERRORMSG "Cancelado. No se ha cambiado nada."
+
+# ID0 que usa ahora mismo esa NAND
+if chk $[DRV] "4:"
+set IDACTUAL $[EMUID0]
+else
+set IDACTUAL $[SYSID0]
+end
+
+# --- Inyectar o no el movable.sed ---
+set MOVABLE no
+if ask "Inyectar tambien el movable.sed\nde la consola vieja?\n \nSi: la $[NOMBRE] usara la SD y el\nID0 de la consola vieja.\nNo: solo se copia la Plaza Mii."
+set MOVABLE si
+set ERRORMSG "No encuentro el movable.sed en\n0:/dundun/movable.sed\n \nNo se ha cambiado nada."
+exist $[MOVPATH]
+set ERRORMSG "Cancelado. No se ha cambiado nada."
+end
+
+# --- La Plaza Mii de esta consola puede ser de otra region ---
+set SAVEDESTINO $[SAVEORIGEN]
+if chk $[REGION] "JPN"
+set SAVEDESTINO 00020208
+elif chk $[REGION] "USA"
+set SAVEDESTINO 00020218
+elif chk $[REGION] "EUR"
+set SAVEDESTINO 00020228
+elif chk $[REGION] "AUS"
+set SAVEDESTINO 00020228
+elif chk $[REGION] "CHN"
+set SAVEDESTINO 00020268
+elif chk $[REGION] "KOR"
+set SAVEDESTINO 00020278
+elif chk $[REGION] "TWN"
+set SAVEDESTINO 00020288
+end
+if chk -u $[SAVEDESTINO] $[SAVEORIGEN]
+ask "La partida es $[SAVEORIGEN] pero\nesta consola ($[REGION]) usa $[SAVEDESTINO].\n \nSe copiara como $[SAVEDESTINO].\nContinuar?"
+end
+
+# --- Confirmacion ---
+ask "Se va a modificar la $[NOMBRE]:\n \n- Partida de Plaza Mii ($[SAVEDESTINO])\n- Extdata f000000b (Miis)\n- movable.sed: $[MOVABLE]\n- Corregir CMAC\n \nContinuar?"
+allow -a $[DRV]
+if chk $[MOVABLE] "si"
+allow $[DRV]/private/movable.sed
+end
+
+# --- Copia de seguridad ---
+set BACKUP $[GM9OUT]/plaza_backup_$[DATESTAMP]_$[TIMESTAMP]
+if ask "Hacer antes una copia completa\nde la $[NOMBRE]? (~1 GB)\n \nMuy recomendable."
+cp -n $[IMAGEN] $[BACKUP]/nand_minsize.bin
+end
+cp -n $[DRV]/private/movable.sed $[BACKUP]/movable.sed
+cp -n $[DRV]/data/$[IDACTUAL] $[BACKUP]/data/$[IDACTUAL]
+set ERRORMSG "Algo ha fallado a mitad.\nCopia de seguridad en:\n$[BACKUP]"
+
+# --- movable.sed: los datos de sistema pasan a la carpeta del ID0 nuevo ---
+set ID $[IDACTUAL]
+if chk $[MOVABLE] "si"
+cp -w -n $[MOVPATH] $[DRV]/private/movable.sed
+if chk $[DRV] "4:"
+set ID $[EMUID0]
+else
+set ID $[SYSID0]
+end
+if chk -u $[ID] $[IDACTUAL]
+# si ya habia una carpeta con el ID0 nuevo (por ejemplo de una copia a mano), se guarda y se quita
+if exist $[DRV]/data/$[ID]
+cp -n $[DRV]/data/$[ID] $[BACKUP]/data_previo/$[ID]
+rm $[DRV]/data/$[ID]
+end
+mv -n $[DRV]/data/$[IDACTUAL] $[DRV]/data/$[ID]
+end
+end
+
+# --- Datos de Plaza Mii ---
+rm -o -s $[DRV]/data/$[ID]/sysdata/$[SAVEDESTINO]
+cp -n $[SAVEPATH] $[DRV]/data/$[ID]/sysdata/$[SAVEDESTINO]
+rm -o -s $[DRV]/data/$[ID]/extdata/00048000/f000000b
+cp -n $[ORIGEN]/extdata/f000000b $[DRV]/data/$[ID]/extdata/00048000/f000000b
+
+# --- Corregir CMAC con las claves de esta consola ---
+if chk $[MOVABLE] "si"
+fixcmac $[DRV]/private/movable.sed
+fixcmac $[DRV]/data/$[ID]
+else
+fixcmac $[DRV]/data/$[ID]/sysdata/$[SAVEDESTINO]
+fixcmac $[DRV]/data/$[ID]/extdata/00048000/f000000b
+end
+
+set SUCCESSMSG "Listo. Arranca la $[NOMBRE] y abre\nla Plaza Mii.\n \nCopia de seguridad en:\n$[BACKUP]"
